@@ -115,14 +115,14 @@ def preview_invitation(token: str = Query(min_length=20), service: TenantAdminSe
     return service.preview_invitation(token)
 
 
-@router.post("/invitations/accept")
-@router.post("/organizations/invitations/accept")
+@router.post("/invitations/accept", include_in_schema=False)
+@router.post("/organizations/invitations/accept", include_in_schema=False)
 async def accept_invitation(data: InvitationAction, user=Depends(current_user), service: TenantAdminService = Depends(svc)):
     return await service.accept_invitation(data.token, user)
 
 
-@router.post("/invitations/reject")
-@router.post("/organizations/invitations/reject")
+@router.post("/invitations/reject", include_in_schema=False)
+@router.post("/organizations/invitations/reject", include_in_schema=False)
 def reject_invitation(data: InvitationAction, user=Depends(current_user), service: TenantAdminService = Depends(svc)):
     return service.reject_invitation(data.token, user)
 
