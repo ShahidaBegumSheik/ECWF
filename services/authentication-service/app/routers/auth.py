@@ -207,7 +207,7 @@ async def google_login(svc: AuthService = Depends(service)):
     return RedirectResponse(await svc.google_url("login"))
 
 
-@oauth_router.get("/auth/google/link")
+@oauth_router.get("/auth/google/link", include_in_schema=False)
 async def google_link_start(user=Depends(get_current_user), svc: AuthService = Depends(service)):
     return RedirectResponse(await svc.google_url("link", user.id))
 
@@ -229,7 +229,7 @@ async def google_link_compat(code: str, state: str, response: Response, svc: Aut
     return {"message": result["message"]}
 
 
-@oauth_router.delete("/auth/google/unlink", response_model=MessageResponse)
+@oauth_router.delete("/auth/google/unlink", response_model=MessageResponse, include_in_schema=False)
 def google_unlink(user=Depends(get_current_user), svc: AuthService = Depends(service)):
     svc.unlink_google(user)
     return MessageResponse(message="Google account unlinked successfully")
@@ -239,8 +239,6 @@ def google_unlink(user=Depends(get_current_user), svc: AuthService = Depends(ser
 def google_logout(response: Response):
     clear_auth_cookies(response)
     return MessageResponse(message="Logged out successfully")
-
-
 
 
 @router.get("/internal/users/by-email", dependencies=[Depends(require_internal_key)])

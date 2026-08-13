@@ -62,13 +62,13 @@ def organization_dashboard(user=Depends(current_user), service: TenantAdminServi
     return service.dashboard(user)
 
 
-@router.post("/departments", status_code=201)
+@router.post("/departments", status_code=201, include_in_schema=False)
 @router.post("/organizations/departments", status_code=201, include_in_schema=False)
 def create_department(data: DepartmentCreate, user=Depends(current_user), service: TenantAdminService = Depends(svc)):
     return service.create_department(data, user)
 
 
-@router.get("/departments")
+@router.get("/departments", include_in_schema=False)
 @router.get("/organizations/departments", include_in_schema=False)
 def list_departments(user=Depends(current_user), service: TenantAdminService = Depends(svc)):
     return service.list_departments(user)
@@ -94,7 +94,7 @@ def update_department_status(department_id: int, data: DepartmentStatusUpdate, u
     return service.set_department_status(department_id, data.is_active, user)
 
 
-@router.delete("/organizations/departments/{department_id}, include_in_schema=False,", status_code=204)
+@router.delete("/organizations/departments/{department_id}", include_in_schema=False, status_code=204)
 def delete_department(department_id: int, user=Depends(current_user), service: TenantAdminService = Depends(svc)):
     service.delete_department(department_id, user)
 
