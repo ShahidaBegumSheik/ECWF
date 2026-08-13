@@ -19,7 +19,6 @@ class Settings(BaseSettings):
     notification_service_url: str = "http://notification-service:8004"
     invitation_preview_url: str = "http://localhost:8003/api/v1/organizations/invitations/preview"
     invitation_expire_days: int = 7
-    frontend_base_url: str = "http://localhost:3000"
     default_temporary_access_hours: int = 24
     max_temporary_access_days: int = 30
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
