@@ -36,6 +36,18 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=8, max_length=16)
     confirm_password: str = Field(min_length=8, max_length=16)
     account_type: Literal["individual", "organization"]
+    organization_name: str | None = None
+    website: str | None = None
+    address: str | None = None
+    primary_domain: str | None = None
+    industry: str | None = None
+    logo_url: str | None = None
+    slug: str | None = None
+    phone: str | None = None
+    postal_code: str | None = None
+    legal_name: str | None = None
+    organization_type: str | None = "enterprise"
+    name: str | None = None
 
     @field_validator("password")
     @classmethod

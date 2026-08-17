@@ -7,7 +7,15 @@ from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.cookies import clear_auth_cookies, clear_flow_cookie, set_auth_cookies, set_flow_cookie
+
+from app.core.cookies import (
+    clear_auth_cookies,
+    clear_flow_cookie,
+    set_auth_cookies,
+    set_flow_cookie,
+    set_otp_cookie,
+)
+
 from app.core.security import create_access_token, create_refresh_token, hash_password
 from app.database.session import get_db
 from app.dependencies.auth import get_current_user
@@ -36,8 +44,15 @@ def require_internal_key(x_internal_api_key: str = Header(..., alias="X-Internal
 
 @router.post("/register", response_model=MessageResponse)
 async def register(data: RegisterRequest, response: Response, svc: AuthService = Depends(service)):
-    token = await svc.register(data)
-    set_flow_cookie(response, settings.registration_otp_cookie_name, token)
+    token, otp = await svc.register(data)
+
+    set_flow_cookie(
+        response,
+        settings.registration_otp_cookie_name,
+        token,
+    )
+
+    set_otp_cookie(response, otp)
     return MessageResponse(message="OTP sent successfully. Verify it within five minutes.")
 
 
@@ -51,6 +66,12 @@ async def verify_registration(data: OTPRequest, response: Response, registration
         set_flow_cookie(error, settings.registration_otp_cookie_name, result["updated_token"])
         return error
     clear_flow_cookie(response, settings.registration_otp_cookie_name)
+    response.delete_cookie(
+    "registration_otp",
+    path=settings.cookie_path,
+    domain=settings.cookie_domain or None,
+    )
+    
     return {"message": "Registration completed successfully", "user": UserResponse.model_validate(result["user"])}
 
 

@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     otp_max_resends: int = 3
 
     registration_otp_cookie_name: str = "registration_otp_token"
+    registration_otp_value_cookie_name: str = "registration_otp"
     password_reset_otp_cookie_name: str = "password_reset_otp_token"
     password_reset_verified_cookie_name: str = "password_reset_verified_token"
     mfa_otp_cookie_name: str = "mfa_otp_token"

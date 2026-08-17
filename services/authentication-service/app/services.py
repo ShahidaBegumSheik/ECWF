@@ -6,7 +6,15 @@ from fastapi import HTTPException
 from httpx import AsyncClient
 
 from app.core.config import settings
-from app.core.security import create_access_token, create_otp_token, create_refresh_token, decode_token, generate_otp, hash_password, verify_password
+from app.core.security import (
+    create_access_token,
+    create_otp_token,
+    create_refresh_token,
+    decode_token,
+    generate_otp,
+    hash_password,
+    verify_password,
+)
 from app.repositories import AuthRepository
 
 
@@ -18,37 +26,159 @@ class AuthService:
     async def register(self, data):
         if self.repo.user_by_email(str(data.email)):
             raise HTTPException(409, "Email is already registered")
+
         otp = generate_otp()
-        role = "tenant_admin" if data.account_type == "organization" else "individual_user"
+
+        role = (
+            "tenant_admin"
+            if data.account_type == "organization"
+            else "individual_user"
+        )
+
         extra = {
             "full_name": data.full_name,
             "password_hash": hash_password(data.password),
             "account_type": data.account_type,
             "role": role,
+            "organization_name": data.organization_name,
+            "website": data.website,
+            "address": data.address,
+            "primary_domain": data.primary_domain,
+            "industry": data.industry,
+            "logo_url": data.logo_url,
+            "slug": data.slug,
+            "phone": data.phone,
+            "postal_code": data.postal_code,
+            "legal_name": data.legal_name,
+            "organization_type": data.organization_type,
+            "name": data.name,
         }
-        token = create_otp_token(str(data.email), otp, "registration", extra)
-        await self._send_otp(str(data.email), otp, "registration")
-        return token
+
+        token = create_otp_token(
+            str(data.email),
+            otp,
+            "registration",
+            extra,
+        )
+
+        await self._send_otp(
+            str(data.email),
+            otp,
+            "registration",
+        )
+
+        return token, otp
 
     async def verify_registration(self, token: str, submitted_otp: str):
         payload = self._otp_payload(token, "registration")
         self._validate_retry_limit(payload)
+
         if submitted_otp != payload["otp"]:
             retries = int(payload.get("retry_count", 0)) + 1
-            return {"verified": False, "updated_token": self._updated_otp(payload, retries), "remaining_attempts": max(settings.otp_max_retries - retries, 0)}
+
+            return {
+                "verified": False,
+                "updated_token": self._updated_otp(payload, retries),
+                "remaining_attempts": max(
+                    settings.otp_max_retries - retries,
+                    0,
+                ),
+            }
+
         email = str(payload["sub"]).lower()
+
         if self.repo.user_by_email(email):
             raise HTTPException(409, "Email is already registered")
+
         data = payload["extra"]
-        user = self.repo.create_user(email, data["full_name"], data["password_hash"], data["account_type"], data["role"], True)
+
+        organization_data = {
+            "name": data.get("name") or data.get("organization_name"),
+            "slug": data.get("slug"),
+            "primary_domain": data.get("primary_domain"),
+            "organization_type": data.get("organization_type") or "enterprise",
+            "industry": data.get("industry"),
+        }
+
+        user = self.repo.create_user(
+            email,
+            data["full_name"],
+            data["password_hash"],
+            data["account_type"],
+            data["role"],
+            True,
+        )
+
         try:
             await self._ensure_user_profile(user.id)
+
+            if data["account_type"] == "organization":
+                access_token = create_access_token(
+                    user.id,
+                    user.token_version,
+                )
+
+                headers = {
+                    "Authorization": f"Bearer {access_token}",
+                    "X-Internal-API-Key": settings.internal_api_key,
+                }
+
+                # 1. Call Tenant Admin Service to create the organization
+                response = await self.http.post(
+                    f"{settings.tenant_admin_service_url}/api/v1/organizations",
+                    headers=headers,
+                    json=organization_data,
+                )
+
+                if response.status_code >= 400:
+                    raise HTTPException(
+                        status_code=502,
+                        detail={
+                            "message": "Organization creation failed",
+                            "service_response": response.text,
+                        },
+                    )
+
+                # 2. Call Tenant Admin Service to update organization profile
+                profile_data = {
+                    "name": data.get("name") or data.get("organization_name"),
+                    "legal_name": data.get("legal_name"),
+                    "industry": data.get("industry"),
+                    "phone": data.get("phone"),
+                    "website": data.get("website"),
+                    "logo_url": data.get("logo_url"),
+                    "address": data.get("address"),
+                    "postal_code": data.get("postal_code"),
+                }
+
+                profile_response = await self.http.put(
+                    f"{settings.tenant_admin_service_url}/api/v1/organizations/profile",
+                    headers=headers,
+                    json=profile_data,
+                )
+
+                if profile_response.status_code >= 400:
+                    raise HTTPException(
+                        status_code=502,
+                        detail={
+                            "message": "Organization profile setup failed",
+                            "service_response": profile_response.text,
+                        },
+                    )
+
         except Exception:
             self.repo.delete_user(user)
             raise
-        await self._send_welcome(user.email, user.full_name)
-        return {"verified": True, "user": user}
 
+        await self._send_welcome(
+            user.email,
+            user.full_name,
+        )
+
+        return {
+            "verified": True,
+            "user": user,
+        }
     async def resend_registration_otp(self, token: str):
         payload = self._otp_payload(token, "registration")
         count = int(payload.get("resend_count", 0))
