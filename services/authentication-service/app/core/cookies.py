@@ -28,5 +28,13 @@ def set_flow_cookie(response: Response, name: str, token: str) -> None:
     response.set_cookie(name, token, **_options(settings.otp_token_expire_minutes * 60))
 
 
+def set_otp_cookie(response: Response, otp: str) -> None:
+    response.set_cookie(
+        settings.registration_otp_value_cookie_name,
+        otp,
+        **_options(settings.otp_token_expire_minutes * 60),
+    )
+
+
 def clear_flow_cookie(response: Response, name: str) -> None:
     response.delete_cookie(name, domain=settings.cookie_domain or None, path=settings.cookie_path)
